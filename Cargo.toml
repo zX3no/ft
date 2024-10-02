@@ -9,5 +9,6 @@ profile = ["mini/profile"]
 [dependencies]
 blake3 = "1.5.4"
 crc32fast = "1.4.2"
+home = "0.5.9"
 mini = { git = "http://github.com/zx3no/mini", version = "0.1.0", features = ["profile"] }
 walkdir = "2.5.0"

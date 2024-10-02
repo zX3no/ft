@@ -5,6 +5,7 @@ use std::{
     io::Cursor,
     os::unix::fs::MetadataExt,
     path::{Path, PathBuf},
+    thread,
 };
 use walkdir::WalkDir;
 
@@ -83,6 +84,7 @@ fn generate_tree(path: &str) -> BTreeMap<PathBuf, u32> {
     return btree;
 }
 
+
 fn main() {
     defer_results!();
     profile!();
@@ -95,14 +97,22 @@ fn main() {
         return;
     }
 
-    let source_path = args.get(0).unwrap();
-    let destination_path = args.get(1).unwrap();
+    let home = home::home_dir().unwrap();
+    let home = home.to_string_lossy();
+
+    let source_path = &args[0].replace("~/", &home);
+    let destination_path = &args[1].replace("~/", &home);
     dbg!(source_path, destination_path);
 
-    let source_path = "/Users/Bay/Music/Opus/Iglooghost";
-    let source = generate_tree(source_path);
-    let destination_path = "/Users/Bay/Music/Example";
-    let destination = generate_tree(destination_path);
+    let sp = source_path.clone();
+    let dp = destination_path.clone();
+
+    let source = thread::spawn(move || generate_tree(&sp));
+    //This is super slow because it's over the network.
+    let destination = thread::spawn(move || generate_tree(&dp));
+
+    let source = source.join().unwrap();
+    let destination = destination.join().unwrap();
 
     for (key, hash) in &source {
         if let Some(dest_hash) = destination.get(key) {
