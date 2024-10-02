@@ -1,11 +1,7 @@
 use blake3::*;
 use mini::{defer_results, profile};
 use std::{
-    collections::BTreeMap,
-    io::Cursor,
-    os::unix::fs::MetadataExt,
-    path::{Path, PathBuf},
-    thread,
+    collections::BTreeMap, fs::create_dir_all, io::Cursor, os::unix::fs::MetadataExt, path::{Path, PathBuf}, thread
 };
 use walkdir::WalkDir;
 
@@ -56,20 +52,35 @@ pub fn hash_crc(path: impl AsRef<Path>) -> Result<u32, std::io::Error> {
 
 // BTreeMap<(Path, Hash)>
 
-fn generate_tree(path: &str) -> BTreeMap<PathBuf, u32> {
+fn generate_tree(path: &str) -> BTreeMap<PathBuf, u64> {
     let mut total = 0;
     let mut size = 0;
     // Ideally this would be &'a str or &'a OsStr, I could do this with winwalk not sure about MacOS.
-    let mut btree: BTreeMap<PathBuf, u32> = BTreeMap::new();
+    let mut btree: BTreeMap<PathBuf, u64> = BTreeMap::new();
     for entry in WalkDir::new(path).sort_by_file_name() {
         if let Ok(entry) = entry {
-            total += 1;
-            size += entry.metadata().unwrap().size();
-            if let Ok(hash) = hash_crc(entry.path()) {
-                //Normalize the paths and remove the parent directory folder.
-                let path = entry.path().as_os_str().to_string_lossy().replace(path, "");
-                btree.insert(PathBuf::from(path), hash);
+            let Ok(metadata) = entry.metadata() else {
+                continue;
+            };
+
+            if metadata.is_dir() {
+                continue;
             }
+
+            let flsz = metadata.size();
+
+            total += 1;
+            size += flsz;
+            // if let Ok(hash) = hash_crc(entry.path()) {
+            //     //Normalize the paths and remove the parent directory folder.
+            //     let path = entry.path().as_os_str().to_string_lossy().replace(path, "");
+            //     btree.insert(PathBuf::from(path), hash as u64);
+            // }
+
+            //Normalize the paths and remove the parent directory folder.
+            let path = entry.path().as_os_str().to_string_lossy().replace(path, "");
+
+            btree.insert(PathBuf::from(path), flsz);
         }
     }
 
@@ -83,7 +94,6 @@ fn generate_tree(path: &str) -> BTreeMap<PathBuf, u32> {
 
     return btree;
 }
-
 
 fn main() {
     defer_results!();
@@ -114,22 +124,37 @@ fn main() {
     let source = source.join().unwrap();
     let destination = destination.join().unwrap();
 
+    // dbg!(source);
+    // dbg!(destination);
+    // return;
+
     for (key, hash) in &source {
         if let Some(dest_hash) = destination.get(key) {
             if hash != dest_hash {
                 //TODO: Create and test a crc mismatch.
-                println!("Key {:?} has crc mismatch", &key);
+                println!(
+                    "'{}' expected hash: {} but found: {}",
+                    key.file_name().unwrap_or_default().to_string_lossy(),
+                    // key,
+                    hash,
+                    dest_hash
+                );
                 let str = key.as_os_str().to_string_lossy();
-                let to = str.replace(source_path, &destination_path);
-                println!("Copying {:#?} to {}", &key, to);
+                let _to = str.replace(source_path, &destination_path);
+                // println!("Copying {:#?} to {}", &key, to);
             }
         } else {
             let str = key.as_os_str().to_string_lossy();
             let from = format!("{}{}", source_path, str);
             let to = format!("{}{}", destination_path, str);
-
-            println!("Copying {} to {}", from, to);
-            // std::fs::copy(&key, to);
+            println!("Did not find {} copying to {}", from, to);
+            let to = Path::new(&to);
+            if let Some(parent) = to.parent() {
+                if !parent.exists() {
+                    create_dir_all(parent).unwrap();
+                }
+            }
+            // std::fs::copy(&from, to).unwrap();
         }
     }
 
