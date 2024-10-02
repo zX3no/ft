@@ -65,7 +65,6 @@ fn generate_tree(path: &str) -> BTreeMap<PathBuf, u32> {
             total += 1;
             size += entry.metadata().unwrap().size();
             if let Ok(hash) = hash_crc(entry.path()) {
-
                 //Normalize the paths and remove the parent directory folder.
                 let path = entry.path().as_os_str().to_string_lossy().replace(path, "");
                 btree.insert(PathBuf::from(path), hash);
@@ -87,23 +86,36 @@ fn generate_tree(path: &str) -> BTreeMap<PathBuf, u32> {
 fn main() {
     defer_results!();
     profile!();
-    let target_path = "/Users/Bay/Music/Opus/Iglooghost";
-    let target = generate_tree(target_path);
+
+    let args: Vec<String> = std::env::args().skip(1).collect();
+
+    //ft <source> <destination> --cleanup
+    if args.len() < 2 {
+        eprintln!("usage: ft <source> <destion>");
+        return;
+    }
+
+    let source_path = args.get(0).unwrap();
+    let destination_path = args.get(1).unwrap();
+    dbg!(source_path, destination_path);
+
+    let source_path = "/Users/Bay/Music/Opus/Iglooghost";
+    let source = generate_tree(source_path);
     let destination_path = "/Users/Bay/Music/Example";
     let destination = generate_tree(destination_path);
 
-    for (key, hash) in &target {
+    for (key, hash) in &source {
         if let Some(dest_hash) = destination.get(key) {
             if hash != dest_hash {
                 //TODO: Create and test a crc mismatch.
                 println!("Key {:?} has crc mismatch", &key);
                 let str = key.as_os_str().to_string_lossy();
-                let to = str.replace(target_path, &destination_path);
+                let to = str.replace(source_path, &destination_path);
                 println!("Copying {:#?} to {}", &key, to);
             }
         } else {
             let str = key.as_os_str().to_string_lossy();
-            let from = format!("{}{}", target_path, str);
+            let from = format!("{}{}", source_path, str);
             let to = format!("{}{}", destination_path, str);
 
             println!("Copying {} to {}", from, to);
@@ -113,7 +125,7 @@ fn main() {
 
     //Check for redundant files.
     for (key, _) in destination {
-        if !target.contains_key(&key) {
+        if !source.contains_key(&key) {
             println!("Key {:#?} should not exist", key);
         }
     }
