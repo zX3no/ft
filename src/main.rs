@@ -7,7 +7,6 @@ use std::{
     thread,
     time::Instant,
 };
-use walkdir::WalkDir;
 
 //TODO: Maybe a progress bar on another thread?
 // fn progress() {
@@ -20,7 +19,8 @@ fn generate_tree(path: &str) -> BTreeMap<PathBuf, u64> {
     // Ideally this would be &'a str or &'a OsStr, I could do this with winwalk not sure about MacOS.
     let mut btree: BTreeMap<PathBuf, u64> = BTreeMap::new();
 
-    for entry in WalkDir::new(path).sort_by_file_name() {
+    // for entry in walkdir::WalkDir::new(path).sort_by_file_name() {
+    for entry in jwalk::WalkDir::new(path).sort(true) {
         profile!("file entry");
 
         if let Ok(entry) = entry {
@@ -138,9 +138,10 @@ fn main() {
             println!("Key {:#?} should not exist", key);
         }
     }
+
     println!(
         "Finished cloning {} in {} seconds",
-        &destination_path,
+        &source_path,
         now.elapsed().as_secs()
     );
 }
