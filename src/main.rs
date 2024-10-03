@@ -19,8 +19,7 @@ fn generate_tree(path: &str) -> BTreeMap<PathBuf, u64> {
     // Ideally this would be &'a str or &'a OsStr, I could do this with winwalk not sure about MacOS.
     let mut btree: BTreeMap<PathBuf, u64> = BTreeMap::new();
 
-    // for entry in walkdir::WalkDir::new(path).sort_by_file_name() {
-    for entry in jwalk::WalkDir::new(path).sort(true) {
+    for entry in walkdir::WalkDir::new(path).sort_by_file_name() {
         profile!("file entry");
 
         if let Ok(entry) = entry {
@@ -108,6 +107,10 @@ fn main() {
     let destination = destination.join().unwrap();
     let source = source.join().unwrap();
 
+    if source.is_empty() {
+        return eprintln!("{} is empty, no files to copy.", source_path);
+    }
+
     for (key, hash) in &source {
         if let Some(dest_hash) = destination.get(key) {
             if hash != dest_hash {
@@ -136,6 +139,7 @@ fn main() {
             }
 
             println!("Key {:#?} should not exist", key);
+            //TODO: Move to trash.
         }
     }
 

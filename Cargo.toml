@@ -8,6 +8,5 @@ profile = ["mini/profile"]
 
 [dependencies]
 home = "0.5.9"
-jwalk = "0.8.1"
 mini = { git = "http://github.com/zx3no/mini", version = "0.1.0", features = ["profile"] }
 walkdir = "2.5.0"
