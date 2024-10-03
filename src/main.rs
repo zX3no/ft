@@ -5,8 +5,16 @@ use std::{
     os::unix::fs::MetadataExt,
     path::{Path, PathBuf},
     thread,
+    time::Instant,
 };
 use walkdir::WalkDir;
+
+//TODO: Maybe a progress bar on another thread?
+// fn progress() {
+//     use std::io::Write;
+//     print!("\x1b[2K\x1b[G");
+//     std::io::stdout().flush().unwrap();
+// }
 
 fn generate_tree(path: &str) -> BTreeMap<PathBuf, u64> {
     // Ideally this would be &'a str or &'a OsStr, I could do this with winwalk not sure about MacOS.
@@ -68,6 +76,7 @@ fn main() {
     defer_results!();
     profile!();
 
+    let now = Instant::now();
     let args: Vec<String> = std::env::args().skip(1).collect();
 
     //ft <source> <destination> --cleanup
@@ -120,7 +129,18 @@ fn main() {
     //Check for redundant files.
     for (key, _) in destination {
         if !source.contains_key(&key) {
+            if let Some(file_name) = key.file_name() {
+                if file_name == ".DS_Store" {
+                    continue;
+                }
+            }
+
             println!("Key {:#?} should not exist", key);
         }
     }
+    println!(
+        "Finished cloning {} in {} seconds",
+        &destination_path,
+        now.elapsed().as_secs()
+    );
 }
