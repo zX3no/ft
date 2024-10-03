@@ -1,7 +1,12 @@
 use blake3::*;
 use mini::{defer_results, profile};
 use std::{
-    collections::BTreeMap, fs::create_dir_all, io::Cursor, os::unix::fs::MetadataExt, path::{Path, PathBuf}, thread
+    collections::BTreeMap,
+    fs::create_dir_all,
+    io::Cursor,
+    os::unix::fs::MetadataExt,
+    path::{Path, PathBuf},
+    thread,
 };
 use walkdir::WalkDir;
 
@@ -95,6 +100,21 @@ fn generate_tree(path: &str) -> BTreeMap<PathBuf, u64> {
     return btree;
 }
 
+fn copy(file: &str, source_path: &str, destination_path: &str) {
+    let from = format!("{}{}", source_path, file);
+    let to = format!("{}{}", destination_path, file);
+    println!("Copying {} to {}", from, to);
+
+    let to = Path::new(&to);
+    if let Some(parent) = to.parent() {
+        if !parent.exists() {
+            create_dir_all(parent).unwrap();
+        }
+    }
+
+    std::fs::copy(&from, to).unwrap();
+}
+
 fn main() {
     defer_results!();
     profile!();
@@ -112,21 +132,23 @@ fn main() {
 
     let source_path = &args[0].replace("~/", &home);
     let destination_path = &args[1].replace("~/", &home);
-    dbg!(source_path, destination_path);
+
+    if !Path::new(source_path).exists() {
+        return eprintln!("error: {} does not exist.", source_path);
+    }
+
+    if !Path::new(destination_path).exists() {
+        return eprintln!("error: {} does not exist.", destination_path);
+    }
 
     let sp = source_path.clone();
     let dp = destination_path.clone();
 
     let source = thread::spawn(move || generate_tree(&sp));
-    //This is super slow because it's over the network.
     let destination = thread::spawn(move || generate_tree(&dp));
 
-    let source = source.join().unwrap();
     let destination = destination.join().unwrap();
-
-    // dbg!(source);
-    // dbg!(destination);
-    // return;
+    let source = source.join().unwrap();
 
     for (key, hash) in &source {
         if let Some(dest_hash) = destination.get(key) {
@@ -139,22 +161,12 @@ fn main() {
                     hash,
                     dest_hash
                 );
-                let str = key.as_os_str().to_string_lossy();
-                let _to = str.replace(source_path, &destination_path);
-                // println!("Copying {:#?} to {}", &key, to);
+                let file = key.as_os_str().to_string_lossy();
+                copy(&file, source_path, destination_path);
             }
         } else {
-            let str = key.as_os_str().to_string_lossy();
-            let from = format!("{}{}", source_path, str);
-            let to = format!("{}{}", destination_path, str);
-            println!("Did not find {} copying to {}", from, to);
-            let to = Path::new(&to);
-            if let Some(parent) = to.parent() {
-                if !parent.exists() {
-                    create_dir_all(parent).unwrap();
-                }
-            }
-            // std::fs::copy(&from, to).unwrap();
+            let file = key.as_os_str().to_string_lossy();
+            copy(&file, source_path, destination_path);
         }
     }
 
